@@ -1,0 +1,11 @@
+*
+!source/
+!source/*.hpp
+!source/*.h
+!source/*.cc
+!.gitignore
+!.gitmodules
+!libshijima
+!build-release.sh
+!build.sh
+!CMakeLists.txt
