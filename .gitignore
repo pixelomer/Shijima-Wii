@@ -9,3 +9,6 @@
 !build-release.sh
 !build.sh
 !CMakeLists.txt
+!.github/
+!.github/workflows/
+!.github/workflows/build.yaml
