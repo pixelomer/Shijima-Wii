@@ -17,7 +17,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: shijima-wii-dev.tar.gz
-          key: ${{ runner.os }}-dev-docker
+          key: dev-docker
       - name: Build Docker image
         if: steps.cache-docker.outputs.cache-hit != 'true'
         run: |
