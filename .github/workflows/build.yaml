@@ -1,0 +1,56 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - name: Cache Docker image
+        id: cache-docker
+        uses: actions/cache@v4
+        with:
+          path: shijima-wii-dev.tar.gz
+          key: dev-docker
+      - name: Build Docker image
+        if: steps.cache-docker.outputs.cache-hit != 'true'
+        run: |
+          pushd docker
+          docker build -t shijima-wii-dev .
+          docker save shijima-wii-dev | gzip > ../shijima-wii-dev.tar.gz
+          popd
+      - name: Import Docker image
+        if: steps.cache-docker.outputs.cache-hit == 'true'
+        run: |
+          gunzip -c < shijima-wii-dev.tar.gz | docker load
+      - name: Build debug
+        run: |
+          docker run --user $(id -u):$(id -g) --rm -v "$(pwd)":/work shijima-wii-dev bash -c \
+            'rm -rf build && ./build.sh'
+          cp build/Shijima-Wii.dol Shijima-Wii/boot.dol
+          touch .keep
+      - name: Archive debug
+        uses: actions/upload-artifact@v4
+        with:
+          name: Shijima-Wii-debug
+          path: |
+            Shijima-Wii
+            .keep
+      - name: Build release
+        run: |
+          docker run --user $(id -u):$(id -g) --rm -v "$(pwd)":/work shijima-wii-dev bash -c \
+            'rm -rf build-release && ./build-release.sh'
+          cp build-release/Shijima-Wii.dol Shijima-Wii/boot.dol
+      - name: Archive release
+        uses: actions/upload-artifact@v4
+        with:
+          name: Shijima-Wii-release
+          path: |
+            Shijima-Wii
+            .keep
