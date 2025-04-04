@@ -10,50 +10,27 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Force tar to run as root
-        run: |
-          sudo chown 0:0 /bin/tar
-          sudo chmod u+s /bin/tar
-      - name: Restore cached devkitPro
-        id: cache-devkitpro
+      - name: Cache Docker image
+        id: cache-docker
         uses: actions/cache@v4
         with:
-          path: /opt/devkitpro
-          key: ${{ runner.os }}-devkitpro
-      - name: Reset tar
+          path: shijima-wii-dev.tar.gz
+          key: ${{ runner.os }}-dev-docker
+      - name: Build Docker image
+        if: steps.cache-docker.outputs.cache-hit != 'true'
         run: |
-          sudo chmod u-s /bin/tar
-      - name: Install devkitPro
-        if: steps.cache-devkitpro.outputs.cache-hit != 'true'
+          pushd docker
+          docker build -t shijima-wii-dev .
+          docker save shijima-wii-dev | gzip > ../shijima-wii-dev.tar.gz
+          popd
+      - name: Import Docker image
+        if: steps.cache-docker.outputs.cache-hit == 'true'
         run: |
-          wget https://apt.devkitpro.org/install-devkitpro-pacman
-          chmod +x ./install-devkitpro-pacman
-          sudo ./install-devkitpro-pacman
-          echo "DEVKITPRO=/opt/devkitpro" >> $GITHUB_ENV
-          echo "DEVKITPRO=/opt/devkitpro/devkitARM" >> $GITHUB_ENV
-          echo "DEVKITPRO=/opt/devkitpro/devkitPPC" >> $GITHUB_ENV
-      - name: Install Wii build dependencies
-        if: steps.cache-devkitpro.outputs.cache-hit != 'true'
-        run: |
-          sudo dkp-pacman --noconfirm -Sy
-          sudo dkp-pacman --noconfirm -Syu
-          sudo dkp-pacman --noconfirm -Sy wii-pkg-config wii-cmake ppc-zlib \
-            ppc-pkg-config ppc-libpng ppc-libjpeg-turbo ppc-freetype ppc-bzip2 \
-            ogc-cmake libogc libgxflux libfat-ogc general-tools gamecube-tools \
-            dkp-cmake-common-utils devkitppc-cmake devkitppc-rules devkitPPC \
-            devkit-env
-      - name: Install GRRLIB
-        if: steps.cache-devkitpro.outputs.cache-hit != 'true'
-        run: |
-          git clone https://github.com/GRRLIB/GRRLIB
-          pushd GRRLIB
-          make -CGRRLIB clean all
-          sudo make -CGRRLIB install
-          /opt/devkitpro/portlibs/wii/bin/powerpc-eabi-cmake -B build
-          cmake --build build --target install
+          gunzip -c < shijima-wii-dev.tar.gz | docker load
       - name: Build debug
         run: |
-          ./build.sh
+          docker run --user $(id -u):$(id -g) --rm -v "$(pwd)":/work shijima-wii-dev bash -c \
+            'rm -rf build && ./build.sh'
       - name: Archive debug
         uses: actions/upload-artifact@v4
         with:
@@ -61,9 +38,10 @@ jobs:
           path: |
             build/Shijima-Wii.dol
             build/Shijima-Wii.elf
-      - name: Build release
+      - name: Build debug
         run: |
-          ./build-release.sh
+          docker run --user $(id -u):$(id -g) --rm -v "$(pwd)":/work shijima-wii-dev bash -c \
+            'rm -rf build-release && ./build-release.sh'
       - name: Archive release
         uses: actions/upload-artifact@v4
         with:

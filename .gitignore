@@ -12,3 +12,5 @@
 !.github/
 !.github/workflows/
 !.github/workflows/build.yaml
+!docker/
+!docker/Dockerfile
