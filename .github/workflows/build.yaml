@@ -34,6 +34,7 @@ jobs:
           echo "DEVKITPRO=/opt/devkitpro/devkitPPC" >> $GITHUB_ENV
       - name: Install Wii build dependencies
         if: steps.cache-devkitpro.outputs.cache-hit != 'true'
+        run: |
           sudo dkp-pacman --noconfirm -Sy
           sudo dkp-pacman --noconfirm -Syu
           sudo dkp-pacman --noconfirm -Sy wii-pkg-config wii-cmake ppc-zlib \
