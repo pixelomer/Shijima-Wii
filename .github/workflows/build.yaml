@@ -34,11 +34,14 @@ jobs:
           docker run --user $(id -u):$(id -g) --rm -v "$(pwd)":/work shijima-wii-dev bash -c \
             'rm -rf build && ./build.sh'
           cp build/Shijima-Wii.dol Shijima-Wii/boot.dol
+          touch .keep
       - name: Archive debug
         uses: actions/upload-artifact@v4
         with:
           name: Shijima-Wii-debug
-          path: Shijima-Wii
+          path: |
+            Shijima-Wii
+            .keep
       - name: Build release
         run: |
           docker run --user $(id -u):$(id -g) --rm -v "$(pwd)":/work shijima-wii-dev bash -c \
@@ -48,4 +51,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Shijima-Wii-release
-          path: Shijima-Wii
+          path: |
+            Shijima-Wii
+            .keep
