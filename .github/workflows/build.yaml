@@ -47,8 +47,8 @@ jobs:
         run: |
           git clone https://github.com/GRRLIB/GRRLIB
           pushd GRRLIB
-          make clean all
-          sudo make install
+          make -CGRRLIB clean all
+          sudo make -CGRRLIB install
           /opt/devkitpro/portlibs/wii/bin/powerpc-eabi-cmake -B build
           cmake --build build --target install
       - name: Build debug
