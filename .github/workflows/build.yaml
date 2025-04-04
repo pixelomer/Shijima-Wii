@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
       - name: Cache Docker image
         id: cache-docker
         uses: actions/cache@v4
@@ -31,21 +33,19 @@ jobs:
         run: |
           docker run --user $(id -u):$(id -g) --rm -v "$(pwd)":/work shijima-wii-dev bash -c \
             'rm -rf build && ./build.sh'
+          cp build/Shijima-Wii.dol Shijima-Wii/boot.dol
       - name: Archive debug
         uses: actions/upload-artifact@v4
         with:
           name: Shijima-Wii-debug
-          path: |
-            build/Shijima-Wii.dol
-            build/Shijima-Wii.elf
-      - name: Build debug
+          path: Shijima-Wii
+      - name: Build release
         run: |
           docker run --user $(id -u):$(id -g) --rm -v "$(pwd)":/work shijima-wii-dev bash -c \
             'rm -rf build-release && ./build-release.sh'
+          cp build-release/Shijima-Wii.dol Shijima-Wii/boot.dol
       - name: Archive release
         uses: actions/upload-artifact@v4
         with:
           name: Shijima-Wii-release
-          path: |
-            build-release/Shijima-Wii.dol
-            build-release/Shijima-Wii.elf
+          path: Shijima-Wii

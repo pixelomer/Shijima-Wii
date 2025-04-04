@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<app version="1">
+	<name>Shijima (Shimeji for Wii)</name>
+	<version>v0.1.0</version>
+	<release_date>20250404000000</release_date>
+	<coder>pixelomer</coder>
+	<short_description>Shimeji mascots meet the Wii</short_description>
+	<long_description>Shimeji desktop mascots meet Nintendo Wii. Mascots will be loaded from sd:/Shijima and are expected to be in the same format as imported Shijima-Qt mascots.
+
+Learn more about Shijima: https://getshijima.app</long_description>
+</app>
