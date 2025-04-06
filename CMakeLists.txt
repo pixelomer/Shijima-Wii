@@ -12,6 +12,10 @@ set(SHIMEJIFINDER_BUILD_EXAMPLES NO)
 add_subdirectory(libshijima)
 include_directories(libshijima)
 
+# qutex
+add_subdirectory(qutex/loader)
+include_directories(qutex)
+
 # GRRLIB and its dependencies
 find_library(GRRLIB grrlib REQUIRED)
 find_library(PNGU pngu REQUIRED)
@@ -39,7 +43,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   source/main.cc
 )
 
-add_dependencies(${PROJECT_NAME} Shijima-Wii shijima)
+add_dependencies(${PROJECT_NAME} Shijima-Wii shijima qutex-loader)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
   ${GRRLIB}
@@ -49,6 +53,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
   ${FREETYPE_LIBRARIES}
   ${FAT}
   shijima
+  qutex-loader
 )
 
 # Here we go, builds executable

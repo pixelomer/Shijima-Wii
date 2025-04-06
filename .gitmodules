@@ -1,3 +1,6 @@
 [submodule "libshijima"]
 	path = libshijima
 	url = git@github.com:pixelomer/libshijima
+[submodule "qutex"]
+	path = qutex
+	url = git@github.com:pixelomer/qutex

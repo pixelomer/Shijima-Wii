@@ -32,6 +32,7 @@
 #include <map>
 #include <list>
 #include <string>
+#include <qutex/reader.hpp>
 #include <shijima/shijima.hpp>
 #include "font.hpp"
 
@@ -126,11 +127,57 @@ static void resized_sprite_write(void *context, void *data, int size) {
     output.write((const char *)data, (size_t)size);
 }
 
-//FIXME: no way to unload a texture ?
-class MascotTexture {
+class MascotSprite {
 public:
-    MascotTexture(): m_valid(false) {}
-    MascotTexture(filesystem::path path): m_valid(false) {
+    virtual void draw(f32 xpos, f32 ypos, bool flipX) const = 0;
+    virtual int width() const = 0;
+    virtual int height() const = 0;
+    virtual ~MascotSprite() {}
+};
+
+class MascotSpriteQutex : public MascotSprite {
+public:
+    MascotSpriteQutex(GRRLIB_texImg *tex, int cw, int ch, int xtex, int ytex,
+        int wtex, int htex, int xoff, int yoff, int wreal, int hreal):
+        tex(tex), cw(cw), ch(ch), xtex(xtex), ytex(ytex), wtex(wtex), htex(htex),
+        xoff(xoff), yoff(yoff), wreal(wreal), hreal(hreal) {}
+    virtual void draw(f32 xpos, f32 ypos, bool flipX) const {
+        ypos += yoff;
+        if (flipX) {
+            xpos += cw - wreal;
+        }
+        else {
+            xpos += xoff;
+        }
+        GRRLIB_DrawPart(xpos, ypos, xtex, ytex, wtex, htex,
+            tex, 0, flipX ? -1 : 1, 1, 0xFFFFFFFF);
+    }
+    virtual int width() const {
+        return wreal;
+    }
+    virtual int height() const {
+        return hreal;
+    }
+    virtual ~MascotSpriteQutex() {}
+private:
+    GRRLIB_texImg *tex;
+    int cw;
+    int ch;
+    int xtex;
+    int ytex;
+    int wtex;
+    int htex;
+    int xoff;
+    int yoff;
+    int wreal;
+    int hreal;
+};
+
+//FIXME: no way to unload a texture ?
+class MascotSpritePNG : public MascotSprite {
+public:
+    MascotSpritePNG(): m_valid(false) {}
+    MascotSpritePNG(filesystem::path path): m_valid(false) {
         string data;
         if (!readFile(path, data)) {
             return;
@@ -150,7 +197,8 @@ public:
             cerr << "WARNING: not mult of 4 -- " << path << endl;
             cerr << "WARNING: image size: " << origWidth << "x" << origHeight << endl;
             if (firstResize) {
-                cerr << "(Shijima-Wii will attempt to resize these images)" << endl;
+                cerr << "Shijima-Wii will attempt to resize these images" << endl;
+                cerr << "This is very slow, consider pre-packing with qutex" << endl;
                 firstResize = false;
             }
             // the resize process is not too reliable
@@ -197,25 +245,120 @@ public:
         m_texture = tex;
         m_valid = true;
     }
+    virtual void draw(f32 xpos, f32 ypos, bool flipX) const {
+        f32 scaleX;
+        if (flipX) {
+            scaleX = -1;
+        }
+        else {
+            scaleX = 1;
+        }
+        GRRLIB_DrawImg(xpos, ypos, m_texture, 0, scaleX,
+            1, 0xFFFFFFFF);
+
+    }
+    virtual ~MascotSpritePNG() {}
     bool valid() const {
         return m_valid;
     }
-    int width() const {
+    virtual int width() const {
         return m_width;
     }
-    int height() const {
+    virtual int height() const {
         return m_height;
     }
     GRRLIB_texImg *texture() const {
-        return m_texture;
-    }
-    operator GRRLIB_texImg *() const {
         return m_texture;
     }
 private:
     bool m_valid;
     GRRLIB_texImg *m_texture;
     int m_width, m_height;
+};
+
+class TexturePack {
+public:
+    TexturePack() {}
+    bool load(filesystem::path const& path) {
+        if (m_sprites.size() != 0) {
+            return false;
+        }
+        auto imgPath = path / "img";
+        auto texPath = path / "textures";
+        if (filesystem::is_directory(texPath)) {
+            qutex::reader reader { texPath };
+            GRRLIB_texImg *currentTexture = NULL;
+            map<filesystem::path, GRRLIB_texImg *> textures;
+            int cw, ch;
+            reader.read_all_sprites(
+                [&](std::filesystem::path path, int width, int height) {
+                    if (m_sprites.count(path) == 0) {
+                        currentTexture = textures[path] =
+                            GRRLIB_LoadTextureFromFile(path.c_str());
+                        cw = width;
+                        ch = height;
+                        if (currentTexture == NULL) {
+                            cerr << "W: couldn't load: " << path << endl;
+                            showConsoleNow();
+                        }
+                    }
+                },
+                [&](int x, int y, qutex::sprite_info const& info) {
+                    auto sprite = new MascotSpriteQutex { currentTexture,
+                        cw, ch, x, y, info.width, info.height, info.offset_x,
+                        info.offset_y, info.real_width, info.real_height };
+                    m_sprites[info.name] = sprite;
+                }
+            );
+        }
+        else if (filesystem::is_directory(imgPath)) {
+            filesystem::directory_iterator imgIterator { imgPath };
+            for (auto &entry : imgIterator) {
+                auto path = entry.path();
+                if (!entry.is_regular_file() || path.extension() != ".png") {
+                    continue;
+                }
+                auto name = path.stem();
+                auto png = new MascotSpritePNG { path };
+                if (png->valid()) {
+                    m_sprites[name] = png;
+                }
+                else {
+                    delete png;
+                }
+            }
+        }
+        cout << "texture count: " << m_sprites.size() << endl;
+        for (auto &pair : m_sprites) {
+            m_preview = pair.second;
+            break;
+        }
+        return (m_sprites.size() > 0);
+    }
+    void clear() {
+        for (auto tex : m_sprites) {
+            delete tex.second;
+        }
+        m_sprites.clear();
+    }
+    MascotSprite *preview() {
+        return m_preview;
+    }
+    const MascotSprite *sprite(string const& name) const {
+        auto stem = (filesystem::path { name }).stem();
+        if (m_sprites.count(stem)) {
+            return m_sprites.at(stem);
+        }
+        else {
+            return NULL;
+        }
+    }
+    ~TexturePack() {
+        clear();
+    }
+private:
+    map<string, MascotSprite *> m_sprites;
+    MascotSprite *m_preview;
 };
 
 class MascotData {
@@ -236,11 +379,9 @@ public:
     bool load(filesystem::path const& path) {
         auto actionsPath = path / "actions.xml";
         auto behaviorsPath = path / "behaviors.xml";
-        auto imgPath = path / "img";
         m_name = path.stem();
         if (!filesystem::is_regular_file(actionsPath) ||
-            !filesystem::is_regular_file(behaviorsPath) ||
-            !filesystem::is_directory(imgPath))
+            !filesystem::is_regular_file(behaviorsPath))
         {
             return m_valid = false;
         }
@@ -258,47 +399,21 @@ public:
             cerr << "ERROR: " << ex.what() << endl;
             return m_valid = false;
         }
-        m_textures.clear();
-        filesystem::directory_iterator imgIterator { imgPath };
-        for (auto &entry : imgIterator) {
-            auto path = entry.path();
-            if (!entry.is_regular_file() || path.extension() != ".png") {
-                continue;
-            }
-            auto name = path.stem();
-            auto &texture = m_textures[name];
-            texture = { path };
-            if (!texture.valid()) {
-                m_textures.erase(name);
-            }
-        }
-        cout << "name: " << m_name << endl;
-        cout << "texture count: " << m_textures.size() << endl;
-        for (auto &pair : m_textures) {
-            m_preview = &pair.second;
-            break;
-        }
-        return m_valid = (m_textures.size() > 0);
+        m_graphics.clear();
+        return m_graphics.load(path);
     }
-    const MascotTexture *texture(string const& name) const {
-        auto stem = (filesystem::path { name }).stem();
-        if (m_textures.count(stem)) {
-            return &m_textures.at(stem);
-        }
-        else {
-            return NULL;
-        }
+    const MascotSprite *sprite(string const& name) const {
+        return m_graphics.sprite(name);
     }
-    const MascotTexture *preview() {
-        return m_preview;
+    const MascotSprite *preview() {
+        return m_graphics.preview();
     }
 private:
     bool m_valid;
     string m_name;
     string m_actions;
     string m_behaviors;
-    map<string, MascotTexture> m_textures;
-    MascotTexture *m_preview;
+    TexturePack m_graphics;
 };
 
 static map<string, MascotData> loadedMascots;
@@ -324,28 +439,27 @@ public:
         bool mirroredRender = mascot.state->looking_right &&
             frame.right_name.empty();
         auto name = frame.get_name(mascot.state->looking_right);
-        auto texture = m_data->texture(name);
-        if (texture == NULL) {
+        auto sprite = m_data->sprite(name);
+        if (sprite == NULL) {
             return;
         }
-        f32 scaleX, scaleY = 1;
+        bool flip;
         if (mirroredRender) {
-            scaleX = -1;
+            flip = true;
             pos = { pos.x + frame.anchor.x,
                 pos.y - frame.anchor.y };
         }
         else {
-            scaleX = 1;
+            flip = false;
             pos = { pos.x - frame.anchor.x, pos.y - frame.anchor.y };
         }
-        m_lastPos = { pos.x, pos.y, (double)texture->width(), (double)texture->height() };
+        m_lastPos = { pos.x, pos.y, (double)sprite->width(), (double)sprite->height() };
         if (mirroredRender) {
-            m_lastPos.x -= texture->width();
+            m_lastPos.x -= sprite->width();
         }
-        GRRLIB_DrawImg(pos.x, pos.y, *texture, 0, scaleX,
-            scaleY, 0xFFFFFFFF);
-        /*GRRLIB_Rectangle(m_lastPos.x, m_lastPos.y, m_lastPos.width,
-            m_lastPos.height, 0x00FFFFFF, false);*/
+        sprite->draw(pos.x, pos.y, flip);
+        GRRLIB_Rectangle(m_lastPos.x, m_lastPos.y, m_lastPos.width,
+            m_lastPos.height, 0x00FFFFFF, false);
     }
     void tick() {
         auto &mascot = *m_product.manager;
@@ -496,9 +610,9 @@ void shijimaWiiTick(struct ir_t const& ir, u32 down, u32 held, u32 up) {
             GRRLIB_Rectangle(0, 0, rmode->fbWidth, rmode->efbHeight, 0x00000088, true);
             auto data = loadedMascotsList[pickerIdx];
             auto preview = data->preview();
-            GRRLIB_DrawImg(rmode->fbWidth / 2 - preview->width() / 2,
+            preview->draw(rmode->fbWidth / 2 - preview->width() / 2,
                 rmode->efbHeight / 2 - preview->height() / 2,
-                *preview, 0, 1, 1, 0xFFFFFFFF);
+                false);
             if (pickerIdx != ((int)loadedMascotsList.size() - 1)) {
                 GRRLIB_Printf(rmode->fbWidth / 2 + preview->width() / 2 + 8,
                     rmode->efbHeight / 2 - 8, texFont, 0xFFFFFFFF, 1,
