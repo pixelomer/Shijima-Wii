@@ -458,8 +458,8 @@ public:
             m_lastPos.x -= sprite->width();
         }
         sprite->draw(pos.x, pos.y, flip);
-        GRRLIB_Rectangle(m_lastPos.x, m_lastPos.y, m_lastPos.width,
-            m_lastPos.height, 0x00FFFFFF, false);
+        /*GRRLIB_Rectangle(m_lastPos.x, m_lastPos.y, m_lastPos.width,
+            m_lastPos.height, 0x00FFFFFF, false);*/
     }
     void tick() {
         auto &mascot = *m_product.manager;
