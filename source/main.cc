@@ -158,6 +158,9 @@ public:
     virtual int height() const {
         return hreal;
     }
+    GRRLIB_texImg *texture() {
+        return tex;
+    }
     virtual ~MascotSpriteQutex() {}
 private:
     GRRLIB_texImg *tex;
@@ -257,7 +260,9 @@ public:
             1, 0xFFFFFFFF);
 
     }
-    virtual ~MascotSpritePNG() {}
+    virtual ~MascotSpritePNG() {
+        GRRLIB_FreeTexture(m_texture);
+    }
     bool valid() const {
         return m_valid;
     }
@@ -336,8 +341,16 @@ public:
         return (m_sprites.size() > 0);
     }
     void clear() {
-        for (auto tex : m_sprites) {
-            delete tex.second;
+        std::set<GRRLIB_texImg *> qutexTextures; //FIXME: this is bad
+        for (auto &pair : m_sprites) {
+            auto qutex = dynamic_cast<MascotSpriteQutex *>(pair.second);
+            if (qutex != nullptr) {
+                qutexTextures.insert(qutex->texture());
+            }
+            delete pair.second;
+        }
+        for (auto tex : qutexTextures) {
+            GRRLIB_FreeTexture(tex);
         }
         m_sprites.clear();
     }
@@ -434,7 +447,8 @@ public:
     }
     void draw() {
         auto &mascot = *m_product.manager;
-        auto pos = mascot.state->anchor;
+        auto anchor = mascot.state->anchor;
+        auto pos = anchor;
         auto &frame = mascot.state->active_frame;
         bool mirroredRender = mascot.state->looking_right &&
             frame.right_name.empty();
@@ -694,7 +708,7 @@ int main() {
             }
             mascots.push_back(new WiiMascot { mascotFactory->spawn(mascotName),
                 &loadedMascots.at(mascotName) });
-            cout << "... Press A to start Shijima-Wii" << endl;
+            cout << "... Press [A] to start Shijima-Wii" << endl;
         }
     }
     catch (std::exception &ex) {
@@ -728,6 +742,20 @@ int main() {
         GRRLIB_Render();
     }
 
+    // cleanup
+    for (auto wiiMascot : mascots) {
+        delete wiiMascot;
+    }
+    mascots.clear();
+    loadedMascotsList.clear();
+    loadedMascots.clear();
+    mascotEnv = nullptr;
+    mascotFactory = nullptr;
+
+    cout << "[HOME] pressed, quitting..." << endl;
+    showConsoleNow();
+
+    GRRLIB_FreeTexture(texFont);
     GRRLIB_Exit();
 
     exit(0); // required according to GRRLIB examples
