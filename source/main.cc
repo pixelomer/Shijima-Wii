@@ -144,7 +144,7 @@ public:
     virtual void draw(f32 xpos, f32 ypos, bool flipX) const {
         ypos += yoff;
         if (flipX) {
-            xpos += cw - wreal;
+            xpos += cw - wtex - xoff;
         }
         else {
             xpos += xoff;
