@@ -723,6 +723,12 @@ int main() {
         u32 held = WPAD_ButtonsHeld(WPAD_CHAN_0);
         u32 up = WPAD_ButtonsUp(WPAD_CHAN_0);
 
+        if (ir.valid) {
+            // adjust ir for screen coordinates
+            ir.x = ((double)ir.x / ir.vres[0]) * rmode->fbWidth;
+            ir.y = ((double)ir.y / ir.vres[1]) * rmode->efbHeight;
+        }
+
         if (down & WPAD_BUTTON_HOME) break;
 
         // console
