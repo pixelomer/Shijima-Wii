@@ -432,6 +432,7 @@ static map<string, MascotData> loadedMascots;
 static vector<MascotData *> loadedMascotsList;
 static unique_ptr<shijima::mascot::factory> mascotFactory;
 static shared_ptr<shijima::mascot::environment> mascotEnv;
+static bool showBoundaries = false;
 
 class WiiMascot {
 public:
@@ -471,8 +472,12 @@ public:
             m_lastPos.x -= sprite->width();
         }
         sprite->draw(pos.x, pos.y, flip);
-        /*GRRLIB_Rectangle(m_lastPos.x, m_lastPos.y, m_lastPos.width,
-            m_lastPos.height, 0x00FFFFFF, false);*/
+        if (showBoundaries) {
+            GRRLIB_Rectangle(m_lastPos.x, m_lastPos.y, m_lastPos.width,
+                m_lastPos.height, 0x0000FFFF, false);
+            GRRLIB_Rectangle(anchor.x - 1, anchor.y - 1, 3,
+                3, 0x00FF00FF, true);
+        }
     }
     void tick() {
         auto &mascot = *m_product.manager;
@@ -729,6 +734,7 @@ int main() {
         }
 
         if (down & WPAD_BUTTON_HOME) break;
+        if (down & WPAD_BUTTON_MINUS) showBoundaries = !showBoundaries;
 
         // console
         flushConsole();
