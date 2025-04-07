@@ -132,6 +132,7 @@ public:
     virtual void draw(f32 xpos, f32 ypos, bool flipX) const = 0;
     virtual int width() const = 0;
     virtual int height() const = 0;
+    virtual bool pointInside(int xpos, int ypos) const = 0;
     virtual ~MascotSprite() {}
 };
 
@@ -157,6 +158,17 @@ public:
     }
     virtual int height() const {
         return hreal;
+    }
+    virtual bool pointInside(int xpos, int ypos) const {
+        xpos -= xoff;
+        ypos -= yoff;
+        if (xpos < 0 || xpos >= wtex || ypos < 0 || ypos >= htex) {
+            return false;
+        }
+        xpos += xtex;
+        ypos += ytex;
+        u32 rgba = GRRLIB_GetPixelFromtexImg(xpos, ypos, tex);
+        return (rgba & 0xFF) > 0;
     }
     GRRLIB_texImg *texture() {
         return tex;
@@ -270,6 +282,13 @@ public:
     }
     virtual int height() const {
         return m_height;
+    }
+    virtual bool pointInside(int xpos, int ypos) const {
+        if (xpos < 0 || xpos >= m_width || ypos < 0 || ypos >= m_height) {
+            return false;
+        }
+        u32 rgba = GRRLIB_GetPixelFromtexImg(xpos, ypos, m_texture);
+        return (rgba & 0xFF) > 0;
     }
     GRRLIB_texImg *texture() const {
         return m_texture;
@@ -454,9 +473,11 @@ public:
             frame.right_name.empty();
         auto name = frame.get_name(mascot.state->looking_right);
         auto sprite = m_data->sprite(name);
+        m_lastSprite = sprite;
         if (sprite == NULL) {
             return;
         }
+        m_lastRenderMirrored = mirroredRender;
         bool flip;
         if (mirroredRender) {
             flip = true;
@@ -491,12 +512,24 @@ public:
     }
     bool pointInside(double x, double y) {
         return x >= m_lastPos.x && x < (m_lastPos.x + m_lastPos.width) &&
-            y >= m_lastPos.y && y < (m_lastPos.y + m_lastPos.height);
+            y >= m_lastPos.y && y < (m_lastPos.y + m_lastPos.height) &&
+            pointInsideSprite(x - m_lastPos.x, y - m_lastPos.y);
     }
 private:
+    bool pointInsideSprite(int x, int y) {
+        if (m_lastSprite == nullptr) {
+            return false;
+        }
+        if (m_lastRenderMirrored) {
+            x = m_lastSprite->width() - x - 1;
+        }
+        return m_lastSprite->pointInside(x, y);
+    }
     bool m_valid;
     shijima::mascot::factory::product m_product;
     MascotData *m_data;
+    const MascotSprite *m_lastSprite;
+    bool m_lastRenderMirrored;
     shijima::math::rec m_lastPos;
 };
 
