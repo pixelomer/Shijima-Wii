@@ -176,7 +176,6 @@ private:
     int hreal;
 };
 
-//FIXME: no way to unload a texture ?
 class MascotSpritePNG : public MascotSprite {
 public:
     MascotSpritePNG(): m_valid(false) {}
