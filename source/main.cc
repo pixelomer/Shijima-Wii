@@ -139,8 +139,8 @@ class MascotSpriteQutex : public MascotSprite {
 public:
     MascotSpriteQutex(GRRLIB_texImg *tex, int cw, int ch, int xtex, int ytex,
         int wtex, int htex, int xoff, int yoff, int wreal, int hreal):
-        tex(tex), cw(cw), ch(ch), xtex(xtex), ytex(ytex), wtex(wtex), htex(htex),
-        xoff(xoff), yoff(yoff), wreal(wreal), hreal(hreal) {}
+        tex(tex), cw(cw), ch(ch), xtex(xtex+1), ytex(ytex+1), wtex(wtex-1),
+        htex(htex-1), xoff(xoff+1), yoff(yoff+1), wreal(wreal), hreal(hreal) {}
     virtual void draw(f32 xpos, f32 ypos, bool flipX) const {
         ypos += yoff;
         if (flipX) {
@@ -328,7 +328,7 @@ public:
                 }
             }
         }
-        cout << "texture count: " << m_sprites.size() << endl;
+        cout << "image count: " << m_sprites.size() << endl;
         for (auto &pair : m_sprites) {
             m_preview = pair.second;
             break;
