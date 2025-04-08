@@ -11,6 +11,9 @@ project(
 )
 
 # libshijima
+if(NOT DEFINED SHIJIMA_USE_PUGIXML)
+  set(SHIJIMA_USE_PUGIXML NO)
+endif()
 set(SHIJIMA_BUILD_EXAMPLES NO)
 set(SHIMEJIFINDER_BUILD_EXAMPLES NO)
 add_subdirectory(libshijima)
@@ -34,9 +37,16 @@ pkg_check_modules(FREETYPE REQUIRED freetype2)
 
 add_executable(${PROJECT_NAME})
 
-target_compile_options(${PROJECT_NAME} PRIVATE
-  -Wall -Wextra -Wpedantic -Werror -Wno-missing-field-initializers
-)
+if(SHIJIMA_USE_PUGIXML)
+  target_compile_options(${PROJECT_NAME} PRIVATE
+    -Wall -Wextra -Wpedantic -Werror -Wno-missing-field-initializers
+  )
+else()
+  target_compile_options(${PROJECT_NAME} PRIVATE
+    -Wall -Wextra -Wpedantic -Werror -Wno-missing-field-initializers
+    -DSHIJIMA_NO_PUGIXML
+  )
+endif()
 
 target_include_directories(${PROJECT_NAME} PRIVATE
   ${DEVKITPRO}/portlibs/ppc/include

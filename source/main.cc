@@ -401,37 +401,64 @@ public:
     string const& name() const {
         return m_name;
     }
-    string const& behaviors() const {
-        return m_behaviors;
-    }
-    string const& actions() const {
-        return m_actions;
-    }
-    bool load(filesystem::path const& path) {
+    bool load(filesystem::path const& path, std::string const& name,
+        shijima::mascot::factory &factory)
+    {
         auto actionsPath = path / "actions.xml";
         auto behaviorsPath = path / "behaviors.xml";
-        m_name = path.stem();
-        if (!filesystem::is_regular_file(actionsPath) ||
-            !filesystem::is_regular_file(behaviorsPath))
+        auto cerealPath = path / "mascot.cereal";
+        m_name = name;
+        if (filesystem::is_regular_file(cerealPath)) {
+            cout << "Loading with mascot.cereal: " << m_name << endl;
+            showConsoleNow();
+            std::string data;
+            if (!readFile(cerealPath, data)) {
+                return m_valid = false;
+            }
+            try {
+                shijima::mascot::factory::registered_tmpl tmpl;
+                tmpl.name = m_name;
+                tmpl.data = std::move(data);
+                factory.register_template(tmpl);
+            }
+            catch (std::exception &ex) {
+                cerr << "ERROR: Deserialize failed for " << m_name << endl;
+                cerr << "ERROR: " << ex.what() << endl;
+                return m_valid = false;
+            }
+        }
+        #if !defined(SHIJIMA_NO_PUGIXML)
+        else if (filesystem::is_regular_file(actionsPath) &&
+            filesystem::is_regular_file(behaviorsPath))
         {
-            return m_valid = false;
+            cout << "Loading with XML files: " << m_name << endl;
+            showConsoleNow();
+            std::string actions, behaviors;
+            if (!readFile(actionsPath, actions) ||
+                !readFile(behaviorsPath, behaviors))
+            {
+                return m_valid = false;
+            }
+            try {
+                shijima::mascot::factory::tmpl tmpl;
+                tmpl.actions_xml = std::move(actions);
+                tmpl.behaviors_xml = std::move(behaviors);
+                tmpl.name = m_name;
+                factory.register_template(tmpl);
+            }
+            catch (std::exception &ex) {
+                cerr << "ERROR: Parse failed for " << m_name << endl;
+                cerr << "ERROR: " << ex.what() << endl;
+                return m_valid = false;
+            }
         }
-        if (!readFile(actionsPath, m_actions) ||
-            !readFile(behaviorsPath, m_behaviors))
-        {
-            return m_valid = false;
-        }
-        try {
-            shijima::parser parser;
-            parser.parse(m_actions, m_behaviors);
-        }
-        catch (std::exception &ex) {
-            cerr << "ERROR: Parse failed for " << m_name << endl;
-            cerr << "ERROR: " << ex.what() << endl;
-            return m_valid = false;
+        #endif
+        else {
+            cerr << "ERROR: Missing files for: " << m_name << endl;
+            showConsoleNow();
         }
         m_graphics.clear();
-        return m_graphics.load(path);
+        return m_valid = m_graphics.load(path);
     }
     const MascotSprite *sprite(string const& name) const {
         return m_graphics.sprite(name);
@@ -442,8 +469,6 @@ public:
 private:
     bool m_valid;
     string m_name;
-    string m_actions;
-    string m_behaviors;
     TexturePack m_graphics;
 };
 
@@ -539,6 +564,7 @@ bool discoverMascots() {
         return false;
     }
     filesystem::directory_iterator iter { MASCOT_LOCATION };
+    mascotFactory = make_unique<shijima::mascot::factory>();
     for (auto &entry : iter) {
         if (!entry.is_directory()) {
             continue;
@@ -548,21 +574,12 @@ bool discoverMascots() {
             continue;
         }
         auto name = path.stem();
-        cout << "Trying to load: " << name << endl;
-        showConsoleNow();
         auto &mascot = loadedMascots[name];
-        if (!mascot.load(path)) {
+        if (!mascot.load(path, name, *mascotFactory)) {
             loadedMascots.erase(name);
         }
     }
-    mascotFactory = make_unique<shijima::mascot::factory>();
     for (auto &pair : loadedMascots) {
-        shijima::mascot::factory::tmpl tmpl;
-        auto &data = pair.second;
-        tmpl.actions_xml = data.actions();
-        tmpl.behaviors_xml = data.behaviors();
-        tmpl.name = data.name();
-        mascotFactory->register_template(tmpl);
         loadedMascotsList.push_back(&pair.second);
     }
     return loadedMascots.size() > 0;
@@ -722,6 +739,8 @@ int main() {
     texFont = GRRLIB_LoadTexture(defaultFontTiles);
     GRRLIB_InitTileSet(texFont, defaultFontCharWidth,
         defaultFontCharHeight, defaultFontStart);
+    
+    showConsoleNow();
 
     try {
         if (!fatInitDefault()) {
