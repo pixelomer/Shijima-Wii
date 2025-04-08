@@ -32,6 +32,7 @@
 #include <map>
 #include <list>
 #include <string>
+#include <algorithm>
 #include <qutex/reader.hpp>
 #include <shijima/shijima.hpp>
 #include "font.hpp"
@@ -54,6 +55,17 @@ static GRRLIB_texImg *texFont;
 #define cout consoleStream
 
 #define MASCOT_LOCATION "/Shijima"
+
+static unsigned char asciitolower(unsigned char in) {
+    if (in <= 'Z' && in >= 'A')
+        return in - ('Z' - 'z');
+    return in;
+}
+
+static void asciitolower(std::string &data) {
+    std::transform(data.begin(), data.end(), data.begin(),
+        [](unsigned char c){ return asciitolower(c); });
+}
 
 static void flushConsole() {
     string newConsole = consoleStream.str();
@@ -315,7 +327,7 @@ public:
             int cw, ch;
             reader.read_all_sprites(
                 [&](std::filesystem::path path, int width, int height) {
-                    if (m_sprites.count(path) == 0) {
+                    if (textures.count(path) == 0) {
                         currentTexture = textures[path] =
                             GRRLIB_LoadTextureFromFile(path.c_str());
                         cw = width;
@@ -325,12 +337,22 @@ public:
                             showConsoleNow();
                         }
                     }
+                    else {
+                        currentTexture = textures.at(path);
+                    }
                 },
                 [&](int x, int y, qutex::sprite_info const& info) {
                     auto sprite = new MascotSpriteQutex { currentTexture,
                         cw, ch, x, y, info.width, info.height, info.offset_x,
                         info.offset_y, info.real_width, info.real_height };
-                    m_sprites[info.name] = sprite;
+                    auto name = info.name;
+                    asciitolower(name);
+                    if (m_sprites.count(name) != 0) {
+                        cerr << "W: duplicate sprites: " << name << endl;
+                        showConsoleNow();
+                        delete m_sprites.at(name);
+                    }
+                    m_sprites[name] = sprite;
                 }
             );
         }
@@ -341,7 +363,13 @@ public:
                 if (!entry.is_regular_file() || path.extension() != ".png") {
                     continue;
                 }
-                auto name = path.stem();
+                std::string name = path.stem();
+                asciitolower(name);
+                if (m_sprites.count(name) != 0) {
+                    cerr << "W: duplicate sprites: " << name << endl;
+                    showConsoleNow();
+                    delete m_sprites.at(name);
+                }
                 auto png = new MascotSpritePNG { path };
                 if (png->valid()) {
                     m_sprites[name] = png;
@@ -497,6 +525,7 @@ public:
         bool mirroredRender = mascot.state->looking_right &&
             frame.right_name.empty();
         auto name = frame.get_name(mascot.state->looking_right);
+        asciitolower(name);
         auto sprite = m_data->sprite(name);
         m_lastSprite = sprite;
         if (sprite == NULL) {
