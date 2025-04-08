@@ -647,11 +647,10 @@ void shijimaWiiTick(struct ir_t const& ir, u32 down, u32 held, u32 up) {
             irValid = false;
         }
         if (mascots.size() > 0) {
-            bool isADown = ((held & WPAD_BUTTON_A) || (down & WPAD_BUTTON_A));
             updateEnvironment();
             if (irValid) {
                 mascotEnv->cursor.move({ ir.x, ir.y });
-                if (dragged == nullptr && isADown) {
+                if (dragged == nullptr && (down & WPAD_BUTTON_A)) {
                     auto target = findMascot(ir.x, ir.y);
                     if (target != nullptr) {
                         target->manager().state->dragging = true;
@@ -665,7 +664,7 @@ void shijimaWiiTick(struct ir_t const& ir, u32 down, u32 held, u32 up) {
                     }
                 }
             }
-            if (dragged != nullptr && (!irValid || !isADown)) {
+            if (dragged != nullptr && (!irValid || !((held | down) & WPAD_BUTTON_A))) {
                 dragged->manager().state->dragging = false;
                 dragged = nullptr;
             }
