@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.18)
 
+if(CMAKE_BUILD_TYPE EQUAL "Release")
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
+
 project(
   Shijima-Wii
   VERSION 1.0.0
