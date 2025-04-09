@@ -510,10 +510,7 @@ class WiiMascot {
 public:
     WiiMascot(): m_valid(false) {}
     WiiMascot(shijima::mascot::factory::product product, MascotData *data):
-        m_valid(true), m_product(std::move(product)), m_data(data)
-    {
-        m_product.manager->reset_position();
-    }
+        m_valid(true), m_product(std::move(product)), m_data(data) {}
     bool valid() const {
         return m_valid;
     }
@@ -723,8 +720,9 @@ void shijimaWiiTick(struct ir_t const& ir, u32 down, u32 held, u32 up) {
                 rmode->efbHeight / 2 + preview->height() / 2 + 8, texFont,
                 0xFFFFFFFF, 1, "%s", data->name().c_str());
             if (down & WPAD_BUTTON_A) {
-                mascots.push_back(new WiiMascot { mascotFactory->spawn(data->name()),
-                    data });
+                auto product = mascotFactory->spawn(data->name());
+                product.manager->reset_position();
+                mascots.push_back(new WiiMascot { std::move(product), data });
             }
             else if (down & WPAD_BUTTON_B) {
                 for (auto iter = mascots.end(); iter != mascots.begin(); ) {
@@ -790,7 +788,9 @@ int main() {
                 mascotName = pair.first;
                 break;
             }
-            mascots.push_back(new WiiMascot { mascotFactory->spawn(mascotName),
+            auto product = mascotFactory->spawn(mascotName);
+            product.manager->reset_position();
+            mascots.push_back(new WiiMascot { std::move(product),
                 &loadedMascots.at(mascotName) });
             cout << "... Press [A] to start Shijima-Wii" << endl;
         }
