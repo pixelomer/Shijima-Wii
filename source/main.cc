@@ -665,30 +665,37 @@ void shijimaWiiTick(struct ir_t const& ir, u32 down, u32 held, u32 up) {
                 dragged->manager().state->dragging = false;
                 dragged = nullptr;
             }
+            static uint8_t frameCounter = 0;
             for (auto iter = mascots.end(); iter != mascots.begin(); ) {
                 --iter;
                 auto mascot = *iter;
-                mascot->tick();
-                if (mascot->manager().state->dead) {
-                    auto erasePos = iter;
-                    ++iter;
-                    mascots.erase(erasePos);
-                    delete mascot;
-                    continue;
+                if (frameCounter != 5) {
+                    mascot->tick();
+                    if (mascot->manager().state->dead) {
+                        auto erasePos = iter;
+                        ++iter;
+                        mascots.erase(erasePos);
+                        delete mascot;
+                        continue;
+                    }
+                    auto &breedRequest = mascot->manager().state->breed_request;
+                    if (breedRequest.available) {
+                        if (breedRequest.name == "") {
+                            breedRequest.name = mascot->data()->name();
+                        }
+                        auto product = mascotFactory->spawn(breedRequest);
+                        breedRequest.available = false;
+                        mascots.push_back(new WiiMascot { std::move(product),
+                            &loadedMascots.at(breedRequest.name) });
+                    }
                 }
                 mascot->draw();
-                auto &breedRequest = mascot->manager().state->breed_request;
-                if (breedRequest.available) {
-                    if (breedRequest.name == "") {
-                        breedRequest.name = mascot->data()->name();
-                    }
-                    auto product = mascotFactory->spawn(breedRequest);
-                    breedRequest.available = false;
-                    mascots.push_back(new WiiMascot { std::move(product),
-                        &loadedMascots.at(breedRequest.name) });
-                }
             }
             mascotEnv->cursor.dx = mascotEnv->cursor.dy = 0;
+            if (rmode->viTVMode != VI_PAL && rmode->viTVMode != VI_MPAL) {
+                // skip every 6th tick if running in NTSC mode
+                frameCounter = (frameCounter + 1) % 6;
+            }
         }
         if (down & WPAD_BUTTON_PLUS) {
             pickerVisible = !pickerVisible;
